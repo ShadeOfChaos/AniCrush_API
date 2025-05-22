@@ -263,6 +263,10 @@ app.get('/api/anime/embed/convert', async (req, res) => {
     }
 });
 
+app.head('/', async (req, res) => {
+    res.sendStatus(200);
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
