@@ -4,6 +4,7 @@ const cors = require('cors');
 const { getCommonHeaders } = require('./mapper');
 const { getHlsLink } = require('./hls');
 const { getGenericHlsLink } = require('./genericHls');
+const { decryptSources } = require('./sources/getEmbedSource');
 require('dotenv').config();
 
 const app = express();
@@ -240,6 +241,7 @@ app.get('/api/anime/hls/:movieId', async (req, res) => {
     }
 });
 
+// Retained in case MegaCloud returns to a similar encryption method
 app.get('/api/anime/embed/convert', async (req, res) => {
     try {
         const { embedUrl, host } = req.query;
@@ -256,6 +258,34 @@ app.get('/api/anime/embed/convert', async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching HLS link:', error);
+        res.status(500).json({
+            error: 'Failed to fetch HLS link',
+            message: error.message
+        });
+    }
+});
+
+// 2025-06-15 - Updated decryption method
+app.get('/api/anime/embed/convert/v2', async (req, res) => {
+    try {
+        const { embedUrl } = req.query;
+
+        if (!embedUrl || !embedUrl.startsWith('http')) {
+            return res.status(400).json({ error: 'Embed URL is required' });
+        }
+        
+        const hlsData = await decryptSources(embedUrl);
+        res.json(hlsData);
+
+    } catch (error) {
+        console.error('Error fetching HLS link:', error);
+        console.log(error);
+        if(error == 'Malformed UTF-8 data') {
+            return res.status(500).json({
+                error: 'Failed to fetch HLS link',
+                message: "MegaCloud decryption key is invalid"
+            });
+        }
         res.status(500).json({
             error: 'Failed to fetch HLS link',
             message: error.message

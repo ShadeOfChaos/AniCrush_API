@@ -39,4 +39,4 @@ async function getHlsLink(embedUrl) {
 
 module.exports = {
     getHlsLink
-}; 
+};
