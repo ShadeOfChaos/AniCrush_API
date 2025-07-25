@@ -4,8 +4,9 @@ const cors = require('cors');
 const { getCommonHeaders } = require('./mapper');
 const { getHlsLink } = require('./hls');
 const { getGenericHlsLink } = require('./genericHls');
-const { decryptSources } = require('./sources/getEmbedSource');
-require('dotenv').config();
+const { decryptSourcesV3 } = require('./sources/getEmbedSource');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 
@@ -19,6 +20,11 @@ app.use(cors({
 
 app.use(express.json());
 
+app.head('/', async (req, res) => {
+    console.error('Process env port:', process.env.PORT);
+    res.status(200).end();
+});
+
 app.get('/', async(req, res) => {
     res.writeHead(403, {'Content-Type': 'text/plain'});
     res.end();
@@ -26,7 +32,7 @@ app.get('/', async(req, res) => {
 
 app.get('/api/anime/search', async (req, res) => {
     try {
-        const { keyword, page = 1, limit = 24 } = req.query;
+        const { keyword, page = 1, limit = 50 } = req.query;
 
         if (!keyword) {
             return res.status(400).json({ error: 'Search keyword is required' });
@@ -274,7 +280,7 @@ app.get('/api/anime/embed/convert/v2', async (req, res) => {
             return res.status(400).json({ error: 'Embed URL is required' });
         }
         
-        const hlsData = await decryptSources(embedUrl);
+        const hlsData = await decryptSourcesV3(embedUrl);
         res.json(hlsData);
 
     } catch (error) {
@@ -293,8 +299,84 @@ app.get('/api/anime/embed/convert/v2', async (req, res) => {
     }
 });
 
-app.head('/', async (req, res) => {
-    res.sendStatus(200);
+// 2025-07-14 - Verify functioning of the MegaCloud keys
+app.head('/api/verify/keys', async (req, res) => {
+    if(process.env.API_KEY == null) {
+        return res.status(500).send({ status: 500, success: false, message: 'Owner fucked up, let him know' });
+    }
+
+    const { authorization } = req.headers;
+    if (!authorization) {
+        return res.status(401).send({ status: 401, success: false, message: 'No permissions' });
+    }
+
+    const token = authorization.replace('Bearer ', '');
+    if(process.env.API_KEY != token) {
+        return res.status(401).send({ status: 401, success: false, message: 'No permissions' });
+    }
+
+    const headers = getCommonHeaders();
+    const { data } = await axios({
+        method: 'GET',
+        url: `https://api.anicrush.to/shared/v2/episode/sources`,
+        params: {
+            _movieId: "iB9jrp",
+            ep: 1,
+            sv: 4,
+            sc: 'sub'
+        },
+        headers
+    });
+
+    const source = data?.result?.link;
+
+    if(data.status == false || source == null || !source.startsWith("https://megacloud.")) {
+        return res.sendStatus(500);
+    }
+
+    try {
+        const hlsData = await decryptSourcesV3(source);
+
+        if(hlsData?.status == false || hlsData?.result == null || hlsData?.error != null) {
+            return res.sendStatus(500);
+        }
+
+        if(hlsData.result?.sources?.length <= 0) {
+            return res.sendStatus(500);
+        }
+
+        let streamSource = null;
+        let mp4Source = null;
+
+        for(let source of hlsData.result.sources) {
+            if(source.type === 'hls') {
+                streamSource = source;
+                break;
+            }
+            if(source.type === 'mp4') {
+                mp4Source = source;
+            }
+        }
+
+        if(streamSource == null && mp4Source == null) {
+            return res.sendStatus(500);
+        }
+        
+    } catch (error) {
+        return res.sendStatus(500);
+    }
+
+    return res.sendStatus(200);
+});
+
+
+app.head('/api', async (req, res) => {
+    res.status(200).end();
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK' });
 });
 
 app.listen(PORT, () => {
