@@ -4,10 +4,11 @@ const { decrypt } = require('./megacloudDecrypt');
 async function asyncGetKeys() {
     const resolution = await Promise.allSettled([
         fetchKey("yogesh", "https://raw.githubusercontent.com/yogesh-hacker/MegacloudKeys/refs/heads/main/keys.json"),
+        fetchKey("esteven", "https://raw.githubusercontent.com/carlosesteven/e1-player-deobf/refs/heads/main/output/key.json"),
+        // Below keys are not v3 keys, they are v2 as of 2025-07-31
         fetchKey("arion", "https://justarion.github.io/keys/e1-player/src/data/keys.json"),
         fetchKey("lunar", "https://api.lunaranime.ru/static/key.txt"),
         fetchKey("itzzzme", "https://raw.githubusercontent.com/itzzzme/megacloud-keys/refs/heads/main/key.txt"),
-        fetchKey("esteven", "https://raw.githubusercontent.com/carlosesteven/e1-player-deobf/refs/heads/main/output/key.json"),
         fetchKey("poypoy", "https://raw.githubusercontent.com/poypoy252525/megacloud-keys/refs/heads/main/hianime_key.txt"),
         fetchKey("zuhaz", "https://raw.githubusercontent.com/zuhaz/key-extractor/refs/heads/main/keys/key-1752248415.txt"),
     ]);
