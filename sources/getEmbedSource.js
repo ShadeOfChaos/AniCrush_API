@@ -109,14 +109,6 @@ async function decryptSourcesV3(embedUrl) {
         }
 
         if(decryptedSources == null) {
-            // decryptedSources = await getDecryptedSourceV3(encrypted, nonce);
-            // if(decryptedSources == null) {
-            //     // Fallback option 1, itzzzme/zenanime
-            //     console.info('Falling back on itzzzme/zenanime');
-            //     decryptedSources = await itzzzmeDecrypt(embedUrl);
-            // }
-
-
             // Race fullfillment of methods, we don't care about the order of execution, just the result
             decryptedSources = await Promise.any([
                 new Promise(async(resolve, reject) => {
