@@ -4,14 +4,16 @@ const { itzzzmeDecrypt } = require('./itzzzmeDecrypt');
 
 async function asyncGetKeys() {
     const resolution = await Promise.allSettled([
+        require('../megacloud.json'), // If you don't have a locally produced key, remove this line
         fetchKey("yogesh", "https://raw.githubusercontent.com/yogesh-hacker/MegacloudKeys/refs/heads/main/keys.json"),
-        fetchKey("esteven", "https://raw.githubusercontent.com/carlosesteven/e1-player-deobf/refs/heads/main/output/key.json"),
+        // Below key is not up to date, somewhere between v2 and v3 as of 2025-08-04
+        // fetchKey("esteven", "https://raw.githubusercontent.com/carlosesteven/e1-player-deobf/refs/heads/main/output/key.json"),
         // Below keys are not v3 keys, they are v2 as of 2025-07-31
-        fetchKey("arion", "https://justarion.github.io/keys/e1-player/src/data/keys.json"),
-        fetchKey("lunar", "https://api.lunaranime.ru/static/key.txt"),
-        fetchKey("itzzzme", "https://raw.githubusercontent.com/itzzzme/megacloud-keys/refs/heads/main/key.txt"),
-        fetchKey("poypoy", "https://raw.githubusercontent.com/poypoy252525/megacloud-keys/refs/heads/main/hianime_key.txt"),
-        fetchKey("zuhaz", "https://raw.githubusercontent.com/zuhaz/key-extractor/refs/heads/main/keys/key-1752248415.txt"),
+        // fetchKey("arion", "https://justarion.github.io/keys/e1-player/src/data/keys.json"),
+        // fetchKey("lunar", "https://api.lunaranime.ru/static/key.txt"),
+        // fetchKey("itzzzme", "https://raw.githubusercontent.com/itzzzme/megacloud-keys/refs/heads/main/key.txt"),
+        // fetchKey("poypoy", "https://raw.githubusercontent.com/poypoy252525/megacloud-keys/refs/heads/main/hianime_key.txt"),
+        // fetchKey("zuhaz", "https://raw.githubusercontent.com/zuhaz/key-extractor/refs/heads/main/keys/key-1752248415.txt"),
     ]);
 
     const keys = resolution.filter(r => r.status === 'fulfilled' && r.value != null).reduce((obj, r) => {
@@ -30,16 +32,6 @@ async function asyncGetKeys() {
     if(keys.length === 0) {
         throw new Error("Failed to fetch any decryption key");
     }
-
-    let keysArr = [];
-    if(keys?.yogesh) keysArr.push(keys.yogesh);
-    if(keys?.esteven) keysArr.push(keys.esteven);
-    // Below keys are not v3 keys, they are v2 as of 2025-07-31
-    if(keys?.arion) keysArr.push(keys.arion);
-    if(keys?.lunar) keysArr.push(keys.lunar);
-    if(keys?.itzzzme) keysArr.push(keys.itzzzme);
-    if(keys?.poypoy) keysArr.push(keys.poypoy);
-    if(keys?.zuhaz) keysArr.push(keys.zuhaz);
 
     return keys;
 }
@@ -95,6 +87,7 @@ async function getDecryptedSourceV3(encrypted, nonce) {
  * @returns {Promise<Object>} - An object with status indicating success or failure, and result or error message.
  */
 async function decryptSourcesV3(embedUrl) {
+    const localDecryptServer = "https://mc.ofchaos.com/api?url=";
     const xraxParams = embedUrl.split('/').pop();
     const xrax = xraxParams.includes('?') ? xraxParams.split('?')[0] : xraxParams;
     const nonce = await getNonce(embedUrl);
@@ -108,16 +101,22 @@ async function decryptSourcesV3(embedUrl) {
             decryptedSources = rawSourceData.sources;
         }
 
-        // If you're running flask, have a look at https://github.com/cvznseoiuelsuirvse/megacloudpy instead
         if(decryptedSources == null) {
             // Race fullfillment of methods, we don't care about the order of execution, just the result
             const resolvedSources = await Promise.any([
+                // Original decryption method, no longer works, might fix at a later date
                 new Promise(async(resolve, reject) => {
                     const result = await getDecryptedSourceV3(encrypted, nonce);
                     if(!result) reject(null);
                     resolve(result);
                 }),
-                // Fallback option 1, itzzzme/zenime
+                // Fallback option 1, local fastapi server - thanks to https://github.com/carlosesteven/MC_API which isbased on https://github.com/cvznseoiuelsuirvse/megacloudpy
+                new Promise(async(resolve, reject) => {
+                    const { data: result } = await axios.get(`${ localDecryptServer }${ embedUrl }`);
+                    if(!result?.sources) reject(null);
+                    resolve(result?.sources);
+                }),
+                // Fallback option 2, itzzzme/zenime
                 new Promise(async(resolve, reject) => {
                     const result = await itzzzmeDecrypt(embedUrl);
                     if(!result) reject(null);
