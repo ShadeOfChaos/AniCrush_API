@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { decrypt } = require('./megacloudDecrypt');
+const { itzzzmeDecrypt } = require('./itzzzmeDecrypt');
 
 async function asyncGetKeys() {
     const resolution = await Promise.allSettled([
@@ -32,10 +33,11 @@ async function asyncGetKeys() {
 
     let keysArr = [];
     if(keys?.yogesh) keysArr.push(keys.yogesh);
+    if(keys?.esteven) keysArr.push(keys.esteven);
+    // Below keys are not v3 keys, they are v2 as of 2025-07-31
     if(keys?.arion) keysArr.push(keys.arion);
     if(keys?.lunar) keysArr.push(keys.lunar);
     if(keys?.itzzzme) keysArr.push(keys.itzzzme);
-    if(keys?.esteven) keysArr.push(keys.esteven);
     if(keys?.poypoy) keysArr.push(keys.poypoy);
     if(keys?.zuhaz) keysArr.push(keys.zuhaz);
 
@@ -54,6 +56,7 @@ function fetchKey(name, url, timeout = 1000) {
 }
 
 async function getDecryptedSourceV3(encrypted, nonce) {
+    let decrypted = null;
     const keys = await asyncGetKeys();
 
     for(let key in keys) {
@@ -64,8 +67,10 @@ async function getDecryptedSourceV3(encrypted, nonce) {
             }
 
             decrypted = decrypt(keys[key], nonce, encrypted);
+            if(!decrypted?.startsWith('https://')) {
+                continue;
+            }
 
-            if(!decrypted) continue;
             console.log("Functioning key:", key);
             return decrypted;
 
@@ -105,6 +110,11 @@ async function decryptSourcesV3(embedUrl) {
 
         if(decryptedSources == null) {
             decryptedSources = await getDecryptedSourceV3(encrypted, nonce);
+            if(decryptedSources == null) {
+                // Fallback option 1, itzzzme/zenanime
+                console.info('Falling back on itzzzme/zenanime');
+                decryptedSources = await itzzzmeDecrypt(embedUrl);
+            }
             if (!decryptedSources) throw new Error("Failed to decrypt source");
         }
 
