@@ -108,15 +108,16 @@ async function decryptSourcesV3(embedUrl) {
             decryptedSources = rawSourceData.sources;
         }
 
+        // If you're running flask, have a look at https://github.com/cvznseoiuelsuirvse/megacloudpy instead
         if(decryptedSources == null) {
             // Race fullfillment of methods, we don't care about the order of execution, just the result
-            decryptedSources = await Promise.any([
+            const resolvedSources = await Promise.any([
                 new Promise(async(resolve, reject) => {
                     const result = await getDecryptedSourceV3(encrypted, nonce);
                     if(!result) reject(null);
                     resolve(result);
                 }),
-                // Fallback option 1, itzzzme/zenanime
+                // Fallback option 1, itzzzme/zenime
                 new Promise(async(resolve, reject) => {
                     const result = await itzzzmeDecrypt(embedUrl);
                     if(!result) reject(null);
@@ -124,9 +125,16 @@ async function decryptSourcesV3(embedUrl) {
                 })
             ]);
 
-            console.log(decryptedSources);
+            if(!Array.isArray(resolvedSources) || resolvedSources.length <= 0) throw new Error("Failed to decrypt source");
 
-            if (!decryptedSources?.startsWith('https://')) throw new Error("Failed to decrypt source");
+            decryptedSources = [];
+            for(let source of resolvedSources) {
+                if(source != null && source?.file?.startsWith('https://')) {
+                    decryptedSources.push(source);
+                }
+            }
+            
+            if(decryptedSources.length <= 0) throw new Error("Failed to decrypt source properly, malformed source");
         }
 
         return {

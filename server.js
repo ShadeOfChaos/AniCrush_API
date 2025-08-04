@@ -25,8 +25,8 @@ app.head('/', async (req, res) => {
     res.status(200).end();
 });
 
-app.get('/', async(req, res) => {
-    res.writeHead(403, {'Content-Type': 'text/plain'});
+app.get('/', async (req, res) => {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
     res.end();
 });
 
@@ -73,7 +73,7 @@ app.get('/api/anime/info/:movieId', async (req, res) => {
 
         const response = await axios({
             method: 'GET',
-            url: `https://api.anicrush.to/shared/v2/movie/getById/${ movieId }`,
+            url: `https://api.anicrush.to/shared/v2/movie/getById/${movieId}`,
             headers
         });
 
@@ -234,7 +234,7 @@ app.get('/api/anime/hls/:movieId', async (req, res) => {
         }
 
         const embedUrl = embedResponse.data.result.link;
-        
+
         const hlsData = await getHlsLink(embedUrl);
         res.json(hlsData);
 
@@ -255,10 +255,10 @@ app.get('/api/anime/embed/convert', async (req, res) => {
         if (!embedUrl || !embedUrl.startsWith('http')) {
             return res.status(400).json({ error: 'Embed URL is required' });
         }
-        if(!host) {
+        if (!host) {
             return res.status(400).json({ error: 'Host is required' });
         }
-        
+
         const hlsData = await getGenericHlsLink(embedUrl, host);
         res.json(hlsData);
 
@@ -279,14 +279,14 @@ app.get('/api/anime/embed/convert/v2', async (req, res) => {
         if (!embedUrl || !embedUrl.startsWith('http')) {
             return res.status(400).json({ error: 'Embed URL is required' });
         }
-        
+
         const hlsData = await decryptSourcesV3(embedUrl);
         res.json(hlsData);
 
     } catch (error) {
         console.error('Error fetching HLS link:', error);
         console.log(error);
-        if(error == 'Malformed UTF-8 data') {
+        if (error == 'Malformed UTF-8 data') {
             return res.status(500).json({
                 error: 'Failed to fetch HLS link',
                 message: "MegaCloud decryption key is invalid"
@@ -301,68 +301,71 @@ app.get('/api/anime/embed/convert/v2', async (req, res) => {
 
 // 2025-07-14 - Verify functioning of the MegaCloud keys
 app.head('/api/verify/keys', async (req, res) => {
-    if(process.env.API_KEY == null) {
-        return res.status(500).send({ status: 500, success: false, message: 'Owner fucked up, let him know' });
-    }
-
-    const { authorization } = req.headers;
-    if (!authorization) {
-        return res.status(401).send({ status: 401, success: false, message: 'No permissions' });
-    }
-
-    const token = authorization.replace('Bearer ', '');
-    if(process.env.API_KEY != token) {
-        return res.status(401).send({ status: 401, success: false, message: 'No permissions' });
-    }
-
-    const headers = getCommonHeaders();
-    const { data } = await axios({
-        method: 'GET',
-        url: `https://api.anicrush.to/shared/v2/episode/sources`,
-        params: {
-            _movieId: "iB9jrp",
-            ep: 1,
-            sv: 4,
-            sc: 'sub'
-        },
-        headers
-    });
-
-    const source = data?.result?.link;
-
-    if(data.status == false || source == null || !source.startsWith("https://megacloud.")) {
-        return res.sendStatus(500);
-    }
-
     try {
-        const hlsData = await decryptSourcesV3(source);
+        if (process.env.API_KEY == null) {
+            console.error('No env variable API_KEY');
+            return res.status(500).send({ status: 500, success: false, message: 'Owner fucked up, let him know' });
+        }
 
-        if(hlsData?.status == false || hlsData?.result == null || hlsData?.error != null) {
+        const { authorization } = req.headers;
+        if (!authorization) {
+            return res.status(401).send({ status: 401, success: false, message: 'No permissions' });
+        }
+
+        const token = authorization.replace('Bearer ', '');
+
+        if (process.env.API_KEY != token) {
+            return res.status(401).send({ status: 401, success: false, message: 'No permissions' });
+        }
+
+        const headers = getCommonHeaders();
+        const { data } = await axios({
+            method: 'GET',
+            url: `https://api.anicrush.to/shared/v2/episode/sources`,
+            params: {
+                _movieId: "iB9jrp",
+                ep: 1,
+                sv: 4,
+                sc: 'sub'
+            },
+            headers
+        });
+
+        const source = data?.result?.link;
+
+        if (data.status == false || source == null || !source.startsWith("https://megacloud.")) {
             return res.sendStatus(500);
         }
 
-        if(hlsData.result?.sources?.length <= 0) {
+        const hlsData = await decryptSourcesV3(source);
+
+        if (hlsData?.status == false || hlsData?.result == null || hlsData?.error != null) {
+            return res.sendStatus(500);
+        }
+
+        if (hlsData.result?.sources?.length <= 0) {
             return res.sendStatus(500);
         }
 
         let streamSource = null;
         let mp4Source = null;
 
-        for(let source of hlsData.result.sources) {
-            if(source.type === 'hls') {
+        for (let source of hlsData.result.sources) {
+            if (source.type === 'hls') {
                 streamSource = source;
                 break;
             }
-            if(source.type === 'mp4') {
+            if (source.type === 'mp4') {
                 mp4Source = source;
             }
         }
 
-        if(streamSource == null && mp4Source == null) {
+        if (streamSource == null && mp4Source == null) {
             return res.sendStatus(500);
         }
-        
+
     } catch (error) {
+        console.error('Error verifying keys:', error);
         return res.sendStatus(500);
     }
 
