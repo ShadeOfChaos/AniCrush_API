@@ -6,6 +6,7 @@ const { getHlsLink } = require('./hls');
 const { getGenericHlsLink } = require('./genericHls');
 const { decryptSourcesV3 } = require('./sources/getEmbedSource');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -372,6 +373,61 @@ app.head('/api/verify/keys', async (req, res) => {
     return res.sendStatus(200);
 });
 
+app.get('/api/write/key', async (req, res) => {
+    const rateLimit = 10 * 60 * 1000;
+    const now = Date.now();
+    const lastCall = global.lastWriteKeyCall;
+    if (lastCall && now - lastCall < rateLimit) {
+        return res.status(429).send({ status: 429, success: false, message: 'Rate limit exceeded, please try again in 10 minutes' });
+    }
+    global.lastWriteKeyCall = now;
+
+    try {
+        if (process.env.API_KEY == null) {
+            console.error('No env variable API_WRITE_KEY');
+            return res.status(500).send({ status: 500, success: false, message: 'Owner fucked up, let him know' });
+        }
+
+        const { authorization } = req.headers;
+        if (!authorization) {
+            return res.status(401).send({ status: 401, success: false, message: 'No permissions' });
+        }
+
+        const token = authorization.replace('Bearer ', '');
+
+        if (process.env.API_WRITE_KEY != token) {
+            return res.status(401).send({ status: 401, success: false, message: 'No permissions' });
+        }
+
+        const { key } = req.query;
+
+        if (!key) {
+            return res.status(400).json({ error: 'key is required' });
+        }
+
+        const keyJson = `{ "megacloud": "${ key }" }`;
+
+        // Write the new key if the old key is different
+        const oldKey = await fs.promises.readFile(path.join(__dirname, 'megacloud.json'), 'utf8').catch(() => null);
+        if (oldKey !== key) {
+            await fs.promises.writeFile(path.join(__dirname, 'megacloud.json'), keyJson);
+        }
+
+    } catch (error) {
+        console.error('Error writing key:', error);
+        return res.sendStatus(500);
+    }
+
+    return res.sendStatus(200);
+});
+
+app.get('/api/key', async (req, res) => {
+    res.sendFile(path.join(__dirname, 'megacloud.json'), err => { 
+        if(err) {
+            res.status(500).json({ "error": "File not available" });
+        }
+    });
+});
 
 app.head('/api', async (req, res) => {
     res.status(200).end();
