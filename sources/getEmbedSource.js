@@ -109,13 +109,32 @@ async function decryptSourcesV3(embedUrl) {
         }
 
         if(decryptedSources == null) {
-            decryptedSources = await getDecryptedSourceV3(encrypted, nonce);
-            if(decryptedSources == null) {
+            // decryptedSources = await getDecryptedSourceV3(encrypted, nonce);
+            // if(decryptedSources == null) {
+            //     // Fallback option 1, itzzzme/zenanime
+            //     console.info('Falling back on itzzzme/zenanime');
+            //     decryptedSources = await itzzzmeDecrypt(embedUrl);
+            // }
+
+
+            // Race fullfillment of methods, we don't care about the order of execution, just the result
+            decryptedSources = await Promise.any([
+                new Promise(async(resolve, reject) => {
+                    const result = await getDecryptedSourceV3(encrypted, nonce);
+                    if(!result) reject(null);
+                    resolve(result);
+                }),
                 // Fallback option 1, itzzzme/zenanime
-                console.info('Falling back on itzzzme/zenanime');
-                decryptedSources = await itzzzmeDecrypt(embedUrl);
-            }
-            if (!decryptedSources) throw new Error("Failed to decrypt source");
+                new Promise(async(resolve, reject) => {
+                    const result = await itzzzmeDecrypt(embedUrl);
+                    if(!result) reject(null);
+                    resolve(result);
+                })
+            ]);
+
+            console.log(decryptedSources);
+
+            if (!decryptedSources?.startsWith('https://')) throw new Error("Failed to decrypt source");
         }
 
         return {

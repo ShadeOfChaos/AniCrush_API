@@ -205,7 +205,7 @@ function decrypt(secretKey, nonce, encryptedText, rounds = 3) {
     } catch(e) {
         console.warn('Could not parse decrypted string, unlikely to be valid. Using regex to verify');
         const regex = /"file":"(.*?)".*?"type":"(.*?)"/;
-        const match = text.match(regex);
+        const match = encryptedText.match(regex);
         const matchedFile = match?.[1];
         const matchType = match?.[2];
         
