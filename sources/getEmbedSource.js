@@ -59,8 +59,17 @@ async function getDecryptedSourceV3(encrypted, nonce) {
             }
 
             decrypted = decrypt(keys[key], nonce, encrypted);
-            if(!decrypted?.startsWith('https://')) {
+
+            if(!Array.isArray(decrypted) || decrypted.length <= 0) {
+                // Failed to decrypt source
                 continue;
+            }
+
+            for(let source of decrypted) {
+                if(source != null && source?.file?.startsWith('https://')) {
+                    // Malformed decrypted source
+                    continue;
+                }
             }
 
             console.log("Functioning key:", key);
